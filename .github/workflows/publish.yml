@@ -32,7 +32,6 @@ jobs:
         run: |
           echo "VERSION=$(./gradlew properties | awk '/^version:/ { print $2; }')" >> $GITHUB_ENV
       - name: "Create release"
-        if: "${{ endsWith(env.VERSION, 'SNAPSHOT') || startsWith(github.ref, 'ref/heads/main/') }}"
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -42,7 +41,6 @@ jobs:
           files: |
             **/build/*.jar
       - name: "Publish"
-        if: "${{ endsWith(env.VERSION, 'SNAPSHOT') || startsWith(github.ref, 'ref/heads/main/') }}"
         run: "./gradlew publish"
         env:
           ORG_GRADLE_PROJECT_hyperaReleasesUsername: "${{ secrets.HYPERA_RELEASES_USERNAME }}"
