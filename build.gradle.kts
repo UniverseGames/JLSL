@@ -1,7 +1,4 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 plugins {
-    id("com.github.johnrengelman.shadow") version "7.0.0"
     `maven-publish`
     java
 }
@@ -12,7 +9,11 @@ repositories {
 }
 
 dependencies {
-    implementation("org.ow2.asm:asm-all:5.2")
+    implementation("org.ow2.asm:asm-tree:9.2")
+    implementation("org.ow2.asm:asm:9.2")
+    implementation("org.ow2.asm:asm-util:9.2")
+
+    testImplementation("junit:junit:4.13")
 }
 
 configurations {
@@ -21,14 +22,8 @@ configurations {
     }
 }
 
-tasks {
-    named<ShadowJar>("shadowJar") {
-        archiveBaseName.set(project.name)
-        mergeServiceFiles()
-        minimize()
-    }
-    test { useJUnitPlatform() }
-    build { dependsOn(shadowJar) }
+tasks.test {
+    useJUnit()
 }
 
 java {

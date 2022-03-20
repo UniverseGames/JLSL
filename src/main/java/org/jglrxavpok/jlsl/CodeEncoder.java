@@ -7,11 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public abstract class CodeEncoder {
-    public JLSLContext context = null;
+    public JLSLContext context;
 
     public abstract void createSourceCode(List<CodeFragment> in, PrintWriter out);
 
-    public void onRequestResult(ArrayList<CodeFragment> fragments) {
+    public void onRequestResult(final ArrayList<CodeFragment> fragments) {
 
     }
 }

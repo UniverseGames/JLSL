@@ -7,7 +7,7 @@ public class MethodCallFragment extends CodeFragment {
     public InvokeTypes invokeType;
     public String returnType;
 
-    public static enum InvokeTypes {
+    public enum InvokeTypes {
         STATIC, VIRTUAL, SPECIAL
     }
 }

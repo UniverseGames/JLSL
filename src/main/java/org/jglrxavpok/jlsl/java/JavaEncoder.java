@@ -6,39 +6,41 @@ import org.jglrxavpok.jlsl.fragments.MethodCallFragment.InvokeTypes;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Stack;
 
 public class JavaEncoder extends CodeEncoder {
-    public static boolean DEBUG = true;
-    public boolean interpreting = false;
+    public static final boolean DEBUG = true;
+    private final Stack<String> typesStack;
+    private final HashMap<String, String> name2type;
+    private final HashMap<Object, String> constants;
+    private final ArrayList<String> initialized;
+    private final Stack<CodeFragment> waiting;
+    private final Stack<String> newInstances;
+    private final HashMap<String, String> imports;
+    public boolean interpreting;
     private int indentation;
     private NewClassFragment currentClass;
     private int currentLine;
     private Stack<String> stack;
-    private Stack<String> typesStack;
-    private HashMap<String, String> name2type;
-    private HashMap<Object, String> constants;
-    private ArrayList<String> initialized;
     private StartOfMethodFragment currentMethod;
     private boolean allowedToPrint;
     private PrintWriter output;
-    private Stack<CodeFragment> waiting;
-    private Stack<String> newInstances;
-    private HashMap<String, String> imports;
-
     private String classPackage;
 
     private String className;
 
-    public JavaEncoder(int glslversion) {
+    public JavaEncoder(final int glslversion) {
         imports = new HashMap<>();
-        stack = new Stack<String>();
-        typesStack = new Stack<String>();
-        initialized = new ArrayList<String>();
-        name2type = new HashMap<String, String>();
-        constants = new HashMap<Object, String>();
-        waiting = new Stack<CodeFragment>();
-        newInstances = new Stack<String>();
+        stack = new Stack<>();
+        typesStack = new Stack<>();
+        initialized = new ArrayList<>();
+        name2type = new HashMap<>();
+        constants = new HashMap<>();
+        waiting = new Stack<>();
+        newInstances = new Stack<>();
 
         init();
     }
@@ -48,19 +50,23 @@ public class JavaEncoder extends CodeEncoder {
     }
 
     private String toJava(String type) {
-        if (type == null) return "";
+		if (type == null) {
+			return "";
+		}
         String copy = type;
-        String end = "";
+        final StringBuilder end = new StringBuilder();
         while (copy.contains("[]")) {
-            copy = copy.replaceFirst("\\[\\]", "");
-            end += "[]";
+            copy = copy.replaceFirst("\\[]", "");
+            end.append("[]");
         }
         type = copy;
-        if (type.startsWith("java.lang.")) type = type.replaceFirst("java.lang.", "");
+		if (type.startsWith("java.lang.")) {
+			type = type.replaceFirst("java.lang.", "");
+		}
         if (type.contains(".") && !type.startsWith("this.") && !this.name2type.containsKey(type)) {
-            String withoutPackage = type.substring(type.lastIndexOf(".") + 1);
+            final String withoutPackage = type.substring(type.lastIndexOf(".") + 1);
             if (imports.containsKey(withoutPackage)) {
-                String fullName = imports.get(withoutPackage);
+                final String fullName = imports.get(withoutPackage);
                 if (fullName.equals(type)) {
                     return withoutPackage + end;
                 }
@@ -72,7 +78,7 @@ public class JavaEncoder extends CodeEncoder {
         return type + end;
     }
 
-    private String getEndOfLine(int currentLine) {
+    private String getEndOfLine(final int currentLine) {
         String s = "";
         // if(currentLine % 2 == 0)
         {
@@ -82,24 +88,22 @@ public class JavaEncoder extends CodeEncoder {
     }
 
     @Override
-    public void onRequestResult(ArrayList<CodeFragment> fragments) {
+    public void onRequestResult(final ArrayList<CodeFragment> fragments) {
     }
 
     @Override
-    public void createSourceCode(List<CodeFragment> in, PrintWriter out) {
+    public void createSourceCode(final List<CodeFragment> in, final PrintWriter out) {
         this.interpreting = true;
         interpret(in);
         this.interpreting = false;
         this.output = out;
         this.allowedToPrint = true;
         println("package " + classPackage + ";\n");
-        Iterator<String> it = imports.values().iterator();
-        while (it.hasNext()) {
-            String importName = it.next();
+        for (final String importName : imports.values()) {
             println("import " + importName + ";");
         }
         for (int index = 0; index < in.size(); index++) {
-            CodeFragment fragment = in.get(index);
+            final CodeFragment fragment = in.get(index);
             this.output = out;
             this.allowedToPrint = !fragment.forbiddenToPrint;
             if (!waiting.isEmpty()) {
@@ -111,7 +115,7 @@ public class JavaEncoder extends CodeEncoder {
         out.flush();
     }
 
-    private void handleCodeFragment(CodeFragment fragment, int index, List<CodeFragment> in, PrintWriter out) {
+    private void handleCodeFragment(final CodeFragment fragment, final int index, final List<CodeFragment> in, final PrintWriter out) {
         if (fragment.getClass() == NewClassFragment.class) {
             handleClassFragment((NewClassFragment) fragment, in, index, out);
             currentClass = (NewClassFragment) fragment;
@@ -199,63 +203,63 @@ public class JavaEncoder extends CodeEncoder {
         }
     }
 
-    private void handleCompareFragment(CompareFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String right = stack.pop();
-        String left = stack.pop();
+    private void handleCompareFragment(final CompareFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String right = stack.pop();
+        final String left = stack.pop();
         stack.push(left + " " + (fragment.inferior ? "<" : ">") + " " + right);
     }
 
-    private void handleNotEqualCheckFragment(NotEqualCheckFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String right = stack.pop();
-        String left = stack.pop();
+    private void handleNotEqualCheckFragment(final NotEqualCheckFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String right = stack.pop();
+        final String left = stack.pop();
         stack.push("(" + left + " " + "!=" + " " + right + ")");
     }
 
-    private void handleEqualCheckFragment(EqualCheckFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String right = stack.pop();
-        String left = stack.pop();
+    private void handleEqualCheckFragment(final EqualCheckFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String right = stack.pop();
+        final String left = stack.pop();
         stack.push("(" + left + " " + "==" + " " + right + ")");
     }
 
-    private void handleNewInstanceFragment(NewInstanceFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleNewInstanceFragment(final NewInstanceFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         newInstances.push(fragment.type);
     }
 
-    private void handleDuplicateFragment(DuplicateFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        if (!newInstances.isEmpty()) return;
+    private void handleDuplicateFragment(final DuplicateFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+		if (!newInstances.isEmpty()) {
+			return;
+		}
         if (fragment.wait > 0) {
             waiting.add(fragment);
             fragment.wait--;
         } else {
-            String a = stack.pop();
+            final String a = stack.pop();
             stack.push(a);
             stack.push(a);
         }
     }
 
-    private void interpret(List<CodeFragment> in) {
-        Stack<String> copy = stack;
-        Stack<String> tmpstack = new Stack<String>();
-        stack = tmpstack;
+    private void interpret(final List<CodeFragment> in) {
+        final Stack<String> copy = stack;
+        stack = new Stack<String>();
         StartOfMethodFragment currentMethod = null;
-        PrintWriter nullPrinter = new PrintWriter(new StringWriter());
+        final PrintWriter nullPrinter = new PrintWriter(new StringWriter());
         for (int i = 0; i < in.size(); i++) {
             boolean dontHandle = false;
-            CodeFragment fragment = in.get(i);
+            final CodeFragment fragment = in.get(i);
             if (fragment.getClass() == StartOfMethodFragment.class) {
                 currentMethod = (StartOfMethodFragment) fragment;
             } else if (fragment.getClass() == FieldFragment.class) {
-                FieldFragment fieldFrag = (FieldFragment) fragment;
+                final FieldFragment fieldFrag = (FieldFragment) fragment;
             } else if (fragment.getClass() == StoreVariableFragment.class) {
-                StoreVariableFragment storeFrag = (StoreVariableFragment) fragment;
-                String type = storeFrag.variableType;
+                final StoreVariableFragment storeFrag = (StoreVariableFragment) fragment;
+                final String type = storeFrag.variableType;
             } else if (fragment.getClass() == PutFieldFragment.class) {
-                PutFieldFragment storeFrag = (PutFieldFragment) fragment;
+                final PutFieldFragment storeFrag = (PutFieldFragment) fragment;
                 if (currentMethod != null && currentMethod.name.equals("<init>")) {
-                    for (int ii = 0; ii < in.size(); ii++) {
-                        CodeFragment fragment1 = in.get(ii);
+                    for (final CodeFragment fragment1 : in) {
                         if (fragment1.getClass() == FieldFragment.class) {
-                            FieldFragment fieldFrag = (FieldFragment) fragment1;
+                            final FieldFragment fieldFrag = (FieldFragment) fragment1;
                             if (fieldFrag.name.equals(storeFrag.fieldName) && fieldFrag.type.equals(storeFrag.fieldType) && !(fieldFrag.access.isFinal() && fieldFrag.initialValue != null)) {
                                 fieldFrag.initialValue = stack.peek();
                                 dontHandle = true;
@@ -291,124 +295,137 @@ public class JavaEncoder extends CodeEncoder {
         println("");
     }
 
-    private void println(String s) {
-        if (allowedToPrint) output.println(s);
+    private void println(final String s) {
+		if (allowedToPrint) {
+			output.println(s);
+		}
     }
 
-    private void handleReturnFragment(ReturnFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleReturnFragment(final ReturnFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         if (in.size() <= index + 1 || in.get(index + 1).getClass() == EndOfMethodFragment.class) {
-            ;
         } else {
             println(getIndent() + "return;" + getEndOfLine(currentLine));
         }
     }
 
-    private void handlePopFragment(PopFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handlePopFragment(final PopFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         println(getIndent() + stack.pop() + ";" + getEndOfLine(currentLine));
     }
 
-    private int countChar(String str, char c) {
+    private int countChar(final String str, final char c) {
         int nbr = 0;
-        for (int i = 0; i < str.length(); i++)
-            if (str.charAt(i) == c) nbr++;
+		for (int i = 0; i < str.length(); i++) {
+			if (str.charAt(i) == c) {
+				nbr++;
+			}
+		}
         return nbr;
     }
 
-    private void handleIfNotStatementFragment(IfNotStatementFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String condition = stack.pop();
+    private void handleIfNotStatementFragment(final IfNotStatementFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String condition = stack.pop();
         println(getIndent() + "if(!" + condition + ")" + getEndOfLine(currentLine));
         println(getIndent() + "{");
         indentation++;
     }
 
-    private void handleXorFragment(XorFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String b = stack.pop();
-        String a = stack.pop();
+    private void handleXorFragment(final XorFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String b = stack.pop();
+        final String a = stack.pop();
         stack.push("(" + a + " || " + b + ")");
     }
 
-    private void handleOrFragment(OrFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String b = stack.pop();
-        String a = stack.pop();
+    private void handleOrFragment(final OrFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String b = stack.pop();
+        final String a = stack.pop();
         stack.push("(" + a + " " + (fragment.isDouble ? "||" : "|") + " " + b + ")");
     }
 
-    private void handleAndFragment(AndFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String b = stack.pop();
-        String a = stack.pop();
+    private void handleAndFragment(final AndFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String b = stack.pop();
+        final String a = stack.pop();
         stack.push("(" + a + " " + (fragment.isDouble ? "&&" : "&") + " " + b + ")");
     }
 
-    private void handleRightShiftFragment(RightShiftFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String b = stack.pop();
-        String a = stack.pop();
+    private void handleRightShiftFragment(final RightShiftFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String b = stack.pop();
+        final String a = stack.pop();
         stack.push(a + ">>" + (!fragment.signed ? ">" : "") + b);
     }
 
-    private void handleLeftShiftFragment(LeftShiftFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String b = stack.pop();
-        String a = stack.pop();
+    private void handleLeftShiftFragment(final LeftShiftFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String b = stack.pop();
+        final String a = stack.pop();
         stack.push(a + "<<" + (!fragment.signed ? "<" : "") + b);
     }
 
-    private void handleCastFragment(CastFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String toCast = stack.pop();
-        String withoutPreviousCast = toCast;
+    private void handleCastFragment(final CastFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String toCast = stack.pop();
 
         String previousType = null;
-        if (withoutPreviousCast.startsWith("(")) {
-            previousType = withoutPreviousCast.substring(1, withoutPreviousCast.indexOf(")") - 1);
-        } else
-            previousType = toJava(currentMethod.varName2TypeMap.get(withoutPreviousCast));
-        if (previousType.equals(toJava(fragment.to))) {
-            if (DEBUG) System.out.println("GLSLEncoder > Cancelling cast for " + toCast);
-        } else
-            stack.push("(" + toJava(fragment.to) + ")" + toCast);
+		if (toCast.startsWith("(")) {
+			previousType = toCast.substring(1, toCast.indexOf(")") - 1);
+		} else {
+			previousType = toJava(currentMethod.varName2TypeMap.get(toCast));
+		}
+		if (previousType.equals(toJava(fragment.to))) {
+			if (DEBUG) {
+				System.out.println("GLSLEncoder > Cancelling cast for " + toCast);
+			}
+		} else {
+			stack.push("(" + toJava(fragment.to) + ")" + toCast);
+		}
     }
 
-    private void handleModFragment(ModFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String a = stack.pop();
-        String b = stack.pop();
+    private void handleModFragment(final ModFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String a = stack.pop();
+        final String b = stack.pop();
         stack.push("(" + b + " % " + a + ")");
     }
 
-    private void handleMethodCallFragment(MethodCallFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleMethodCallFragment(final MethodCallFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         String s = "";
         String n = fragment.methodName;
         boolean isConstructor = false;
         if (n.equals("<init>")) {
             n = "new " + toJava(fragment.methodOwner);
             isConstructor = true;
-            if (!newInstances.isEmpty()) newInstances.pop();
+			if (!newInstances.isEmpty()) {
+				newInstances.pop();
+			}
         }
         String key = fragment.methodName;
-        if (toJava(fragment.methodOwner) != null && !toJava(fragment.methodOwner).equals("null") && !toJava(fragment.methodOwner).trim().equals(""))
-            key = toJava(fragment.methodOwner) + "." + key;
+        toJava(fragment.methodOwner);
+		if (!toJava(fragment.methodOwner).equals("null") && !toJava(fragment.methodOwner).trim().equals("")) {
+			key = toJava(fragment.methodOwner) + "." + key;
+		}
         if (fragment.invokeType == InvokeTypes.SPECIAL && currentMethod.name.equals("<init>") && fragment.methodOwner.equals(currentClass.superclass)) {
             this.allowedToPrint = false;
         }
 
         s += n + "(";
-        ArrayList<String> args = new ArrayList<String>();
-        for (@SuppressWarnings("unused")
-                String type : fragment.argumentsTypes) {
+        final ArrayList<String> args = new ArrayList<>();
+        for (@SuppressWarnings("unused") final
+        String type : fragment.argumentsTypes) {
             String arg = stack.pop();
             if (arg.startsWith("(") && arg.endsWith(")") && countChar(arg, '(') == countChar(arg, ')')) {
                 arg = arg.substring(1, arg.length() - 1);
             }
             args.add(arg);
         }
-        String argsStr = "";
+        final StringBuilder argsStr = new StringBuilder();
         for (int i = 0; i < args.size(); i++) {
-            if (i != 0) argsStr += ", ";
-            argsStr += args.get(args.size() - 1 - i);
+			if (i != 0) {
+				argsStr.append(", ");
+			}
+            argsStr.append(args.get(args.size() - 1 - i));
         }
         s += argsStr;
         s += ")";
-        boolean ownerBefore = false;
-        boolean parenthesis = true;
-        int ownerPosition = 0;
-        boolean actsAsField = false;
+        final boolean ownerBefore = false;
+        final boolean parenthesis = true;
+        final int ownerPosition = 0;
+        final boolean actsAsField = false;
         if (fragment.invokeType == InvokeTypes.VIRTUAL) {
             String owner = stack.pop();
             if (owner.equals(currentClass.className) || owner.equals("this")) {
@@ -418,86 +435,78 @@ public class JavaEncoder extends CodeEncoder {
                     owner = owner.substring(1, owner.length() - 1);
                 }
             }
-            if (!ownerBefore) {
-                if (actsAsField) {
-                    if (n.length() >= 1)
-                        s = (owner != null ? owner : "") + "." + n;
-                    else
-                        s = (owner != null ? owner : "");
-                    if (argsStr.length() > 0) {
-                        s += " = " + argsStr;
-                    }
-                } else
-                    s = (owner != null ? owner + "." : "") + n + (parenthesis ? "(" : "") + argsStr + (parenthesis ? ")" : "");
-            } else
-                s = (owner != null ? owner : "") + n + (parenthesis ? "(" : "") + argsStr + (parenthesis ? ")" : "");
-            if (fragment.returnType.equals("void")) {
-                println(getIndent() + s + ";" + getEndOfLine(currentLine));
-            } else
-                stack.push("(" + s + ")");
+            s = (owner != null ? owner + "." : "") + n + (parenthesis ? "(" : "") + argsStr + ")";
+			if (fragment.returnType.equals("void")) {
+				println(getIndent() + s + ";" + getEndOfLine(currentLine));
+			} else {
+				stack.push("(" + s + ")");
+			}
         } else if (fragment.invokeType == InvokeTypes.STATIC) {
             String ownership = "";
-            String owner = toJava(fragment.methodOwner);
-            if (owner != null && !owner.trim().equals("") && !owner.equals("null"))
-                ownership = owner + (n.length() > 0 ? "." : "");
-            stack.push(ownership + n + (parenthesis ? "(" : "") + argsStr + (parenthesis ? ")" : ""));
+            final String owner = toJava(fragment.methodOwner);
+			if (!owner.trim().equals("") && !owner.equals("null")) {
+				ownership = owner + (n.length() > 0 ? "." : "");
+			}
+            stack.push(ownership + n + "(" + argsStr + ")");
         } else {
-            stack.push(n + (parenthesis ? "(" : "") + argsStr + (parenthesis ? ")" : ""));
+            stack.push(n + "(" + argsStr + ")");
 
-            if (fragment.returnType.equals("void") && !fragment.methodName.equals("<init>"))
-                println(getIndent() + stack.pop() + ";");
+			if (fragment.returnType.equals("void") && !fragment.methodName.equals("<init>")) {
+				println(getIndent() + stack.pop() + ";");
+			}
         }
 
     }
 
-    private void handleElseStatementFragment(ElseStatementFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleElseStatementFragment(final ElseStatementFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         println(getIndent() + "else" + getEndOfLine(currentLine));
         println(getIndent() + "{");
         indentation++;
     }
 
-    private void handleEndOfBlockFragment(EndOfBlockFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleEndOfBlockFragment(final EndOfBlockFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         indentation--;
         println(getIndent() + "}");
     }
 
-    private void handleIfStatementFragment(IfStatementFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String condition = stack.pop();
+    private void handleIfStatementFragment(final IfStatementFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String condition = stack.pop();
         println(getIndent() + "if(" + condition + ")" + getEndOfLine(currentLine));
         println(getIndent() + "{");
         indentation++;
     }
 
-    private void handleArrayStoreFragment(ArrayStoreFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleArrayStoreFragment(final ArrayStoreFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         String result = "";
         String toAdd = "";
         for (int i = 0; i < 2; i++) {
-            String lastType = typesStack.pop();
-            String copy = lastType;
+            String copy = typesStack.pop();
             int dimensions = 0;
-            if (copy != null) while (copy.indexOf("[]") >= 0) {
-                copy = copy.substring(copy.indexOf("[]") + 2);
-                dimensions++;
-            }
-            String val = stack.pop();
-            String arrayIndex = "";
+			if (copy != null) {
+				while (copy.contains("[]")) {
+					copy = copy.substring(copy.indexOf("[]") + 2);
+					dimensions++;
+				}
+			}
+            final String val = stack.pop();
+            final StringBuilder arrayIndex = new StringBuilder();
             for (int dim = 0; dim < dimensions; dim++) {
-                arrayIndex = "[" + stack.pop() + "]" + arrayIndex;
+                arrayIndex.insert(0, "[" + stack.pop() + "]");
             }
-            String name = stack.pop();
-            if (i == 1)
-                result = val + toAdd + " = " + result;
-            else if (i == 0) {
-                result = val + result;
-                toAdd = "[" + name + "]";
-            }
+            final String name = stack.pop();
+			if (i == 1) {
+				result = val + toAdd + " = " + result;
+			} else if (i == 0) {
+				result = val + result;
+				toAdd = "[" + name + "]";
+			}
         }
         println(getIndent() + result + ";" + getEndOfLine(currentLine));
     }
 
-    private void handleArrayOfArrayLoadFragment(ArrayOfArrayLoadFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String value = stack.pop();
-        String name = stack.pop();
+    private void handleArrayOfArrayLoadFragment(final ArrayOfArrayLoadFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String value = stack.pop();
+        final String name = stack.pop();
         stack.push(name + "[" + value + "]");
         if (name2type.containsKey(name + "[" + value + "]")) {
             name2type.put(name + "[" + value + "]", name.substring(0, name.indexOf("[")));
@@ -505,50 +514,51 @@ public class JavaEncoder extends CodeEncoder {
         typesStack.push(name2type.get(name + "[" + value + "]"));
     }
 
-    private void handleDivFragment(DivFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String a = stack.pop();
-        String b = stack.pop();
+    private void handleDivFragment(final DivFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String a = stack.pop();
+        final String b = stack.pop();
         stack.push("(" + b + "/" + a + ")");
     }
 
-    private void handleMulFragment(MulFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String a = stack.pop();
-        String b = stack.pop();
+    private void handleMulFragment(final MulFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String a = stack.pop();
+        final String b = stack.pop();
         stack.push("(" + b + "*" + a + ")");
     }
 
-    private void handleSubFragment(SubFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String a = stack.pop();
-        String b = stack.pop();
+    private void handleSubFragment(final SubFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String a = stack.pop();
+        final String b = stack.pop();
         stack.push("(" + b + "-" + a + ")");
     }
 
-    private void handleAddFragment(AddFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String a = stack.pop();
-        String b = stack.pop();
+    private void handleAddFragment(final AddFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String a = stack.pop();
+        final String b = stack.pop();
         stack.push("(" + b + "+" + a + ")");
     }
 
-    private void handleReturnValueFragment(ReturnValueFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleReturnValueFragment(final ReturnValueFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         println(getIndent() + "return" + " " + stack.pop() + ";" + getEndOfLine(currentLine));
     }
 
-    private void handleLoadConstantFragment(LoadConstantFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleLoadConstantFragment(final LoadConstantFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         stack.push(fragment.value + "");
     }
 
-    private void handleLdcFragment(LdcFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        if (constants.containsKey(fragment.value))
-            stack.push("" + constants.get(fragment.value));
-        else if (fragment.value instanceof String)
-            stack.push("\"" + fragment.value + "\"");
-        else if (fragment.value instanceof Number)
-            stack.push("" + fragment.value);
-        else if (DEBUG)
-            System.out.println("GLSLEncoder > Invalid value: " + fragment.value + " of type " + fragment.value.getClass().getCanonicalName());
+    private void handleLdcFragment(final LdcFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+		if (constants.containsKey(fragment.value)) {
+			stack.push("" + constants.get(fragment.value));
+		} else if (fragment.value instanceof String) {
+			stack.push("\"" + fragment.value + "\"");
+		} else if (fragment.value instanceof Number) {
+			stack.push("" + fragment.value);
+		} else if (DEBUG) {
+			System.out.println("GLSLEncoder > Invalid value: " + fragment.value + " of type " + fragment.value.getClass().getCanonicalName());
+		}
     }
 
-    private void handleStoreVariableFragment(StoreVariableFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleStoreVariableFragment(final StoreVariableFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         String value = stack.pop();
         if (value.startsWith("(") && value.endsWith(")") && countChar(value, '(') == countChar(value, ')')) {
             value = value.substring(1, value.length() - 1);
@@ -560,16 +570,18 @@ public class JavaEncoder extends CodeEncoder {
             println(getIndent() + fragment.variableName + "--;" + getEndOfLine(currentLine));
             return;
         }
-        String javaType = toJava(currentMethod.varName2TypeMap.get(fragment.variableName));
+        final String javaType = toJava(currentMethod.varName2TypeMap.get(fragment.variableName));
         if (javaType.equals("boolean")) {
-            if (value.equals("0"))
-                value = "false";
-            else if (value.equals("1")) value = "true";
+			if (value.equals("0")) {
+				value = "false";
+			} else if (value.equals("1")) {
+				value = "true";
+			}
         } else if (javaType.equals("char")) {
             try {
-                value = "'" + Character.valueOf((char) Integer.parseInt(value)) + "'";
-            } catch (Exception e) {
-                ;
+                value = "'" + (char) Integer.parseInt(value) + "'";
+            } catch (final Exception e) {
+                e.printStackTrace();
             }
         }
         if (initialized.contains(fragment.variableName)) {
@@ -580,27 +592,27 @@ public class JavaEncoder extends CodeEncoder {
         }
     }
 
-    private void handleLoadVariableFragment(LoadVariableFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleLoadVariableFragment(final LoadVariableFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         stack.push(fragment.variableName);
     }
 
-    private void handleNewPrimitiveArrayFragment(NewPrimitiveArrayFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String dimension = "[" + stack.pop() + "]";
+    private void handleNewPrimitiveArrayFragment(final NewPrimitiveArrayFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String dimension = "[" + stack.pop() + "]";
         stack.push(fragment.type + dimension);
     }
 
-    private void handleBiPushFragment(IntPushFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleBiPushFragment(final IntPushFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         stack.push(fragment.value + "");
     }
 
-    private void handleGetFieldFragment(GetFieldFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String owner = toJava(stack.pop());
-        String ownership = owner + ".";
+    private void handleGetFieldFragment(final GetFieldFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String owner = toJava(stack.pop());
+        final String ownership = owner + ".";
         stack.push(ownership + fragment.fieldName);
         typesStack.push(fragment.fieldType);
     }
 
-    private void handlePutFieldFragment(PutFieldFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handlePutFieldFragment(final PutFieldFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         String value = stack.pop();
         if (value.startsWith("(") && value.endsWith(")") && countChar(value, '(') == countChar(value, ')')) {
             value = value.substring(1, value.length() - 1);
@@ -612,18 +624,20 @@ public class JavaEncoder extends CodeEncoder {
             println(getIndent() + fragment.fieldName + "--;" + getEndOfLine(currentLine));
             return;
         }
-        String javaType = toJava(currentMethod.varName2TypeMap.get(fragment.fieldName));
+        final String javaType = toJava(currentMethod.varName2TypeMap.get(fragment.fieldName));
         if (javaType.equals("boolean")) {
-            if (value.equals("0"))
-                value = "false";
-            else if (value.equals("1")) value = "true";
+			if (value.equals("0")) {
+				value = "false";
+			} else if (value.equals("1")) {
+				value = "true";
+			}
         }
-        String owner = stack.pop();
-        String ownership = owner + ".";
+        final String owner = stack.pop();
+        final String ownership = owner + ".";
         for (int i = 0; i < index; i++) {
-            CodeFragment frag = in.get(i);
+            final CodeFragment frag = in.get(i);
             if (frag.getClass() == FieldFragment.class) {
-                FieldFragment fieldFrag = (FieldFragment) frag;
+                final FieldFragment fieldFrag = (FieldFragment) frag;
                 if (fieldFrag.access.isFinal() && fieldFrag.name.equals(fragment.fieldName)) {
                     return;
                 }
@@ -632,38 +646,40 @@ public class JavaEncoder extends CodeEncoder {
         println(getIndent() + ownership + fragment.fieldName + " " + "=" + " " + value + ";" + getEndOfLine(currentLine));
     }
 
-    private void handleNewMultiArrayFragment(NewMultiArrayFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String s = "";
-        ArrayList<String> list = new ArrayList<String>();
+    private void handleNewMultiArrayFragment(final NewMultiArrayFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final StringBuilder s = new StringBuilder();
+        final ArrayList<String> list = new ArrayList<>();
         for (int dim = 0; dim < fragment.dimensions; dim++) {
             list.add(stack.pop());
         }
         for (int dim = 0; dim < fragment.dimensions; dim++) {
-            s += "[" + list.get(list.size() - dim - 1) + "]";
+            s.append("[").append(list.get(list.size() - dim - 1)).append("]");
         }
         stack.push(toJava(fragment.type) + s);
     }
 
-    private void handleNewArrayFragment(NewArrayFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String s = "[" + stack.pop() + "]";
+    private void handleNewArrayFragment(final NewArrayFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String s = "[" + stack.pop() + "]";
         stack.push(toJava(fragment.type) + s);
     }
 
-    private void handleEndOfMethodFragment(EndOfMethodFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleEndOfMethodFragment(final EndOfMethodFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         indentation--;
         println(getIndent() + "}");
     }
 
-    private void handleStartOfMethodFragment(StartOfMethodFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleStartOfMethodFragment(final StartOfMethodFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         if (fragment.name.equals("<init>")) {
-            String n = className;
+            final String n = className;
             initialized.clear();
             println();
-            String args = "";
+            final StringBuilder args = new StringBuilder();
             for (int i = 0; i < fragment.argumentsNames.size(); i++) {
-                String s = toJava(fragment.argumentsTypes.get(i)) + " " + fragment.argumentsNames.get(i);
-                if (i != 0) args += ", ";
-                args += s;
+                final String s = toJava(fragment.argumentsTypes.get(i)) + " " + fragment.argumentsNames.get(i);
+				if (i != 0) {
+					args.append(", ");
+				}
+                args.append(s);
             }
             String accessStr = "";
             if (fragment.access.isPublic()) {
@@ -677,22 +693,23 @@ public class JavaEncoder extends CodeEncoder {
         } else {
             initialized.clear();
             println();
-            String args = "";
+            final StringBuilder args = new StringBuilder();
             for (int i = 0; i < fragment.argumentsNames.size(); i++) {
-                String s = toJava(fragment.argumentsTypes.get(i)) + " " + fragment.argumentsNames.get(i);
-                if (i != 0) args += ", ";
-                args += s;
+                final String s = toJava(fragment.argumentsTypes.get(i)) + " " + fragment.argumentsNames.get(i);
+				if (i != 0) {
+					args.append(", ");
+				}
+                args.append(s);
             }
             println(getIndent() + toJava(fragment.returnType) + " " + fragment.name + "(" + args + ")\n" + getIndent() + "{");
         }
         indentation++;
     }
 
-    private void handleFieldFragment(FieldFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
-        String storageType = null;
-        for (CodeFragment child : fragment.getChildren()) {
-            if (child instanceof AnnotationFragment) {
-                AnnotationFragment annot = (AnnotationFragment) child;
+    private void handleFieldFragment(final FieldFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
+        final String storageType = null;
+        for (final CodeFragment child : fragment.getChildren()) {
+            if (child instanceof AnnotationFragment annot) {
                 println(getIndent() + "@" + toJava(annot.name));
             }
         }
@@ -712,24 +729,26 @@ public class JavaEncoder extends CodeEncoder {
         }
         str += toJava(fragment.type) + " ";
         str += fragment.name;
-        if (fragment.initialValue != null) str += " = " + fragment.initialValue;
+		if (fragment.initialValue != null) {
+			str += " = " + fragment.initialValue;
+		}
         println(getIndent() + str + ";");
     }
 
     @SuppressWarnings("unchecked")
-    private void handleClassFragment(NewClassFragment fragment, List<CodeFragment> in, int index, PrintWriter out) {
+    private void handleClassFragment(final NewClassFragment fragment, final List<CodeFragment> in, final int index, final PrintWriter out) {
         println("// Original class name: " + fragment.className + " compiled from " + fragment.sourceFile + " and of version " + fragment.classVersion);
         classPackage = fragment.className.substring(0, fragment.className.lastIndexOf("."));
         className = fragment.className.substring(fragment.className.lastIndexOf(".") + 1);
-        for (CodeFragment child : fragment.getChildren()) {
-            if (child instanceof AnnotationFragment) {
-                AnnotationFragment annotFragment = (AnnotationFragment) child;
+        for (final CodeFragment child : fragment.getChildren()) {
+            if (child instanceof AnnotationFragment annotFragment) {
                 println("@" + toJava(annotFragment.name));
             }
         }
         String hierarchy = "";
-        if (fragment.superclass != null && !fragment.superclass.equals(Object.class.getCanonicalName()))
-            hierarchy += " extends " + toJava(fragment.superclass);
+		if (fragment.superclass != null && !fragment.superclass.equals(Object.class.getCanonicalName())) {
+			hierarchy += " extends " + toJava(fragment.superclass);
+		}
         String access = "";
         if (fragment.access.isPublic()) {
             access += "public ";
@@ -744,10 +763,11 @@ public class JavaEncoder extends CodeEncoder {
     }
 
     private String getIndent() {
-        String s = "";
-        for (int i = 0; i < indentation; i++)
-            s += "    ";
-        return s;
+        final StringBuilder s = new StringBuilder();
+		for (int i = 0; i < indentation; i++) {
+			s.append("    ");
+		}
+        return s.toString();
     }
 
 }

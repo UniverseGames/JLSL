@@ -6,7 +6,7 @@ import java.util.List;
 
 public abstract class CodeDecoder {
 
-    public JLSLContext context = null;
+    public JLSLContext context;
 
     public abstract void handleClass(Object data, List<CodeFragment> out);
 }

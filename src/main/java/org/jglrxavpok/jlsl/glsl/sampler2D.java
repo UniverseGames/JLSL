@@ -2,11 +2,11 @@ package org.jglrxavpok.jlsl.glsl;
 
 import org.jglrxavpok.jlsl.glsl.GLSL.Substitute;
 
-public class Sampler2D {
-    public int id;
+public class sampler2D {
+    public final int id;
 
     @Substitute(value = "", usesParenthesis = false, ownerBefore = true)
-    public Sampler2D(int id) {
+    public sampler2D(final int id) {
         this.id = id;
     }
 }

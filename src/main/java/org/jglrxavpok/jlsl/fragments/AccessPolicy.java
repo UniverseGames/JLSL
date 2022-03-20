@@ -4,14 +4,14 @@ import org.objectweb.asm.Opcodes;
 
 public class AccessPolicy implements Opcodes {
 
-    private boolean isPublic;
-    private boolean isProtected;
-    private boolean isPrivate;
-    private boolean isStatic;
-    private boolean isAbstract;
-    private boolean isFinal;
+    private final boolean isPublic;
+    private final boolean isProtected;
+    private final boolean isPrivate;
+    private final boolean isStatic;
+    private final boolean isAbstract;
+    private final boolean isFinal;
 
-    public AccessPolicy(int access) {
+    public AccessPolicy(final int access) {
         isPrivate = hasModifier(access, ACC_PRIVATE);
         isProtected = hasModifier(access, ACC_PROTECTED);
         isPublic = hasModifier(access, ACC_PUBLIC);
@@ -44,7 +44,7 @@ public class AccessPolicy implements Opcodes {
         return isStatic;
     }
 
-    private boolean hasModifier(int i, int modifier) {
+    private boolean hasModifier(final int i, final int modifier) {
         return (i | modifier) == i;
     }
 }
