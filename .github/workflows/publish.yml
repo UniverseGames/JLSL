@@ -18,6 +18,9 @@ jobs:
           java-version: "${{ env.JAVA_VERSION }}"
           distribution: "adopt"
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: "Gradle build"
         uses: "gradle/gradle-build-action@v2"
         with:
