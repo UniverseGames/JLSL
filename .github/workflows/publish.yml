@@ -42,6 +42,7 @@ jobs:
             **/build/*.jar
       - name: "Publish"
         run: "./gradlew publish"
+        continue-on-error: true
         env:
           ORG_GRADLE_PROJECT_hyperaReleasesUsername: "${{ secrets.HYPERA_RELEASES_USERNAME }}"
           ORG_GRADLE_PROJECT_hyperaReleasesPassword: "${{ secrets.HYPERA_RELEASES_PASSWORD }}"
